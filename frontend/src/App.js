@@ -114,9 +114,9 @@ function App() {
   };
 
   const airlineLogoStyle = { 
-    width: '24px', 
-    height: '24px', 
-    marginRight: '8px', 
+    width: '96px', 
+    height: '96px', 
+    marginRight: '10px', 
     objectFit: 'contain', 
     verticalAlign: 'middle',
     border: '1px solid #eee',
