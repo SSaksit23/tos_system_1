@@ -50,7 +50,6 @@ app.get('/api/locations/search', async (req, res) => {
       keyword: keyword,
       subType: Amadeus.location.any // Gets City and Airport
     });
-    // For location search, response.data (the array of locations) is typically what's needed.
     res.json(response.data);
   } catch (error) {
     console.error('Amadeus Location Search Error (raw):', error);
@@ -92,8 +91,10 @@ app.post('/api/flights/search', async (req, res) => {
     departureDate,
     adults: parseInt(adults, 10),
     max: 10, // Limit number of offers
-    // ***** 'include' PARAMETER IS NOW COMMENTED OUT FOR TESTING *****
-    // include: ' μέρος,aircraft,carriers' 
+    // ***** RE-ENABLING 'include' with standard values (array of strings) *****
+    // include: [' μέρος'] 
+    // These are common values. If Amadeus still rejects, we may need to test them one by one
+    // or consult specific Amadeus documentation for Flight Offers Search 'include' options.
   };
 
   if (returnDate) {
@@ -110,18 +111,14 @@ app.post('/api/flights/search', async (req, res) => {
     console.log('Amadeus Search Params (sending to SDK):', searchParams);
     const response = await amadeus.shopping.flightOffersSearch.get(searchParams);
     
-    // Send the entire 'result' object which contains 'data' and 'dictionaries'
-    // If 'include' is removed, response.result might still have a 'data' field,
-    // but 'dictionaries' will likely be empty or undefined.
-    // The frontend will need to handle this gracefully (e.g., not show map/airline names).
-    res.json(response.result); 
+    res.json(response.result); // Send the entire 'result' object
 
   } catch (error) {
-    console.error('Amadeus Flight Search Error (raw):', error); // Log the raw error object
+    console.error('Amadeus Flight Search Error (raw):', error); 
     let errorDetails = "An unexpected error occurred with the Amadeus API.";
     let statusCode = 500;
 
-    if (error.response) { // Amadeus SDK often wraps errors in error.response
+    if (error.response) { 
         statusCode = error.response.statusCode || 500;
         if (error.response.result && error.response.result.errors && Array.isArray(error.response.result.errors)) {
             errorDetails = error.response.result.errors.map(e => 
@@ -129,25 +126,25 @@ app.post('/api/flights/search', async (req, res) => {
             ).join('; ');
         } else if (error.description) {
             errorDetails = error.description;
-             if (typeof errorDetails !== 'string' && errorDetails.message) {
+             if (typeof errorDetails !== 'string' && errorDetails.message) { 
                 errorDetails = errorDetails.message;
-            } else if (Array.isArray(errorDetails)) {
+            } else if (Array.isArray(errorDetails)) { 
                 errorDetails = errorDetails.map(e => String(e.detail || e.title || 'Unknown sub-error')).join('; ');
             }
-        } else if (error.code === 'DATE_FORMAT') {
+        } else if (error.code === 'DATE_FORMAT') { 
              errorDetails = `Invalid date format. Please use YYYY-MM-DD. Details: ${error.description || error.message}`;
              statusCode = 400;
-        } else if (error.message) { // Check for a basic message if other parsing fails
+        } else if (error.message) { 
             errorDetails = error.message;
         }
-    } else if (error.message) { // Generic JavaScript error
+    } else if (error.message) { 
         errorDetails = error.message;
     }
     
     console.error('Formatted Amadeus Flight Search Error Details for Response:', errorDetails);
     res.status(statusCode).json({
       error: 'Failed to fetch flight offers from Amadeus.',
-      details: String(errorDetails) // Ensure details is a string
+      details: String(errorDetails) 
     });
   }
 });
