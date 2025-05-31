@@ -1,0 +1,22 @@
+# Node / JavaScript
+node_modules/
+npm-debug.log
+yarn-error.log
+build/
+dist/
+
+# Environment variables - IMPORTANT for security
+.env
+*.env
+backend/.env
+frontend/.env
+
+# IDE & OS specific
+.idea/
+.vscode/
+*.DS_Store
+Thumbs.db
+
+# Docker (optional, depending on your needs)
+# If you have docker-compose.override.yml with local secrets, ignore it.
+# docker-compose.override.yml
