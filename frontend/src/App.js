@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import GoogleMapComponent from './GoogleMapComponent'; 
+import GoogleMapComponent from './GoogleMapComponent'; // Your Google Maps component
 
+// Import react-bootstrap components
 import Container from 'react-bootstrap/Container';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
@@ -12,9 +13,14 @@ import Alert from 'react-bootstrap/Alert';
 import Spinner from 'react-bootstrap/Spinner';
 import Badge from 'react-bootstrap/Badge';
 
+// Note: Bootstrap CSS should be imported once globally, e.g., in src/index.js
+// import 'bootstrap/dist/css/bootstrap.min.css'; 
+
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'THB', 'JPY', 'CAD', 'AUD'];
 
+// --- This is the SINGLE, COMPLETE App function definition ---
 function App() {
+  // State variables
   const [backendMessage, setBackendMessage] = useState('Checking backend connection...');
   const [isBackendConnected, setIsBackendConnected] = useState(false);
 
@@ -32,6 +38,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Health check for backend
   useEffect(() => {
     axios.get('http://localhost:5000/api/health')
       .then(response => {
@@ -45,6 +52,7 @@ function App() {
       });
   }, []);
 
+  // Flight search handler
   const handleFlightSearch = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -105,19 +113,18 @@ function App() {
     return isoDuration.replace('PT', '').replace('H', 'h ').replace('M', 'm');
   };
 
-  // Updated airlineLogoStyle for 400% size increase (24px * 4 = 96px)
   const airlineLogoStyle = { 
-    width: '96px',  // Increased from 24px
-    height: '96px', // Increased from 24px
-    marginRight: '10px', // Slightly increased margin for larger logo
+    width: '96px', 
+    height: '96px', 
+    marginRight: '10px', 
     objectFit: 'contain', 
     verticalAlign: 'middle',
     border: '1px solid #eee',
-    borderRadius: '4px' // Slightly larger radius for larger logo
+    borderRadius: '3px'
   };
 
   return (
-    <Container className="py-3 py-md-4"> {/* Standard container, should be responsive and centered */}
+    <Container className="py-3 py-md-4">
       <header className="text-center mb-4"><h1>✈️ Tour Operator System</h1></header>
       <Alert variant={isBackendConnected ? 'success' : 'danger'} className="text-center shadow-sm">
         {backendMessage}
@@ -125,13 +132,11 @@ function App() {
 
       {isBackendConnected && (
         <Row className="justify-content-center"> 
-          <Col md={10} lg={8} xl={7}> {/* This Col centers its content block */}
-            
+          <Col md={10} lg={8} xl={7}>
             <Card className="mb-4 p-3 p-md-4 shadow">
               <Card.Body>
                 <Card.Title as="h2" className="mb-3 text-primary">Search Flights</Card.Title>
                 <Form onSubmit={handleFlightSearch}>
-                  {/* Form rows for trip type, currency */}
                   <Row className="mb-3">
                     <Col md={6} className="mb-3 mb-md-0">
                       <Form.Group controlId="tripType">
@@ -152,7 +157,6 @@ function App() {
                     </Col>
                   </Row>
 
-                  {/* Form rows for origin/dest */}
                   <Row className="mb-3">
                     <Col md={6} className="mb-3 mb-md-0">
                       <Form.Group controlId="origin">
@@ -168,7 +172,6 @@ function App() {
                     </Col>
                   </Row>
 
-                  {/* Form rows for dates */}
                   <Row className="mb-3">
                     <Col md={tripType === 'roundTrip' ? 6 : 12} className="mb-3 mb-md-0">
                       <Form.Group controlId="departureDate">
@@ -186,7 +189,6 @@ function App() {
                     )}
                   </Row>
                   
-                  {/* Form row for adults */}
                   <Row className="mb-3">
                     <Col md={4} sm={6} xs={8}>
                       <Form.Group controlId="adults">
@@ -278,8 +280,8 @@ function App() {
                                 <div className="d-flex align-items-center mb-1 small">
                                   <img 
                                     src={logoPath} 
-                                    alt=""
-                                    style={airlineLogoStyle} // Using the updated style for logo
+                                    alt="" 
+                                    style={airlineLogoStyle}
                                     onError={(e) => { e.target.style.display = 'none'; }} 
                                   />
                                   <span>Airline: {airlineName} (Flight {airlineCode} {segment.number})</span>
@@ -305,6 +307,6 @@ function App() {
       </footer>
     </Container>
   );
-}
+} // --- End of the single App function ---
 
-export default App;
+export default App; // --- This is the single, correct export statement ---
