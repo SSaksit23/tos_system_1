@@ -1,47 +1,47 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import GoogleMapComponent from './GoogleMapComponent'; // Your Google Maps component
 
-const styles = {
-  container: { padding: '20px', fontFamily: 'Arial, sans-serif', maxWidth: '800px', margin: '0 auto' },
-  header: { textAlign: 'center', marginBottom: '30px' },
-  form: { display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '30px', padding: '20px', border: '1px solid #ddd', borderRadius: '8px', backgroundColor: '#f9f9f9' },
-  inputRow: { display: 'flex', gap: '10px', alignItems: 'center' },
-  inputGroup: { display: 'flex', flexDirection: 'column', flex: 1 },
-  label: { marginBottom: '5px', fontWeight: 'bold' },
-  input: { padding: '10px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '16px' },
-  select: { padding: '10px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '16px', flex: 1 },
-  button: { padding: '12px 20px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', fontSize: '16px', cursor: 'pointer', marginTop: '10px' },
-  resultsContainer: { marginTop: '20px' },
-  flightOffer: { border: '1px solid #eee', padding: '15px', marginBottom: '15px', borderRadius: '8px', backgroundColor: '#fff' },
-  price: { fontSize: '1.2em', fontWeight: 'bold', color: '#28a745' },
-  segment: { borderTop: '1px dashed #eee', marginTop: '10px', paddingTop: '10px' },
-  error: { color: 'red', marginTop: '10px', padding: '10px', backgroundColor: '#f8d7da', border: '1px solid #f5c6cb', borderRadius: '4px'},
-  loading: { textAlign: 'center', fontSize: '1.2em', color: '#555' },
-  backendStatus: { padding: '10px', margin: '20px 0', borderRadius: '8px', textAlign: 'center' }
-};
+// Import react-bootstrap components
+import Container from 'react-bootstrap/Container';
+import Row from 'react-bootstrap/Row';
+import Col from 'react-bootstrap/Col';
+import Form from 'react-bootstrap/Form';
+import Button from 'react-bootstrap/Button';
+import Card from 'react-bootstrap/Card';
+import Alert from 'react-bootstrap/Alert';
+import Spinner from 'react-bootstrap/Spinner';
+import Badge from 'react-bootstrap/Badge'; // Added for results count
+
+// Note: Bootstrap CSS should be imported once globally, e.g., in src/index.js
+// import 'bootstrap/dist/css/bootstrap.min.css'; 
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'THB', 'JPY', 'CAD', 'AUD']; // Example currencies
 
 function App() {
+  // State variables
   const [backendMessage, setBackendMessage] = useState('Checking backend connection...');
   const [isBackendConnected, setIsBackendConnected] = useState(false);
 
-  // Flight Search State
-  const [tripType, setTripType] = useState('oneWay'); // 'oneWay' or 'roundTrip'
+  const [tripType, setTripType] = useState('oneWay');
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
   const [departureDate, setDepartureDate] = useState('');
-  const [returnDate, setReturnDate] = useState(''); // New for round trip
+  const [returnDate, setReturnDate] = useState('');
   const [adults, setAdults] = useState(1);
-  const [currency, setCurrency] = useState('EUR'); // New for currency
+  const [currency, setCurrency] = useState('THB');
+  
   const [flightOffers, setFlightOffers] = useState([]);
+  const [dictionaries, setDictionaries] = useState(null);
+  
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Health check for backend
   useEffect(() => {
     axios.get('http://localhost:5000/api/health')
       .then(response => {
-        setBackendMessage(`Backend Status: ${response.data.status} - ${response.data.message} ✅`);
+        setBackendMessage(`Backend: ${response.data.message} ✅`);
         setIsBackendConnected(true);
       })
       .catch(err => {
@@ -51,43 +51,54 @@ function App() {
       });
   }, []);
 
+  // Flight search handler
   const handleFlightSearch = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
     setFlightOffers([]);
+    setDictionaries(null);
 
     const searchPayload = {
       originLocationCode: origin.toUpperCase(),
       destinationLocationCode: destination.toUpperCase(),
       departureDate,
-      adults,
-      currencyCode: currency, // Send selected currency
+      adults: parseInt(adults, 10),
+      currencyCode: currency,
     };
 
     if (tripType === 'roundTrip' && returnDate) {
-      searchPayload.returnDate = returnDate; // Send return date for round trips
+      searchPayload.returnDate = returnDate;
     } else if (tripType === 'roundTrip' && !returnDate) {
-      setError('Please select a return date for round trips.');
+      setError('Please select a return date for round trip flights.');
       setIsLoading(false);
       return;
     }
 
-
     try {
       const response = await axios.post('http://localhost:5000/api/flights/search', searchPayload);
-      setFlightOffers(response.data);
+      if (response.data && response.data.data) {
+        setFlightOffers(response.data.data);
+        setDictionaries(response.data.dictionaries);
+         if (response.data.data.length === 0) {
+            setError("No flight offers found for the selected criteria.");
+        }
+      } else {
+        setFlightOffers([]);
+        setDictionaries(null);
+        setError("No flight data in response or unexpected structure.");
+        console.warn("No flight data in response or unexpected structure:", response.data);
+      }
     } catch (err) {
       console.error('Flight search error:', err.response ? err.response.data : err.message);
       let displayError = 'Failed to fetch flight offers. Please check inputs and try again.';
       if (err.response && err.response.data) {
-        if (err.response.data.details) {
-            // Check if details is an array of Amadeus error objects or a string
-            if (Array.isArray(err.response.data.details)) {
-                 displayError = `Error: ${err.response.data.details.map(d => `${d.title || ''}: ${d.detail || ''} (status ${d.status || ''})`).join(', ')}`;
-            } else if (typeof err.response.data.details === 'string') {
-                displayError = `Error: ${err.response.data.details}`;
-            }
+        if (err.response.data.details && Array.isArray(err.response.data.details)) {
+            displayError = `Error: ${err.response.data.details.map(d => `${d.title || ''}${d.detail ? (': ' + d.detail) : ''} (status ${d.status || ''})`).join('; ')}`;
+        } else if (err.response.data.errors && Array.isArray(err.response.data.errors)){
+             displayError = `Error: ${err.response.data.errors.map(d => `${d.title || ''}${d.detail ? (': ' + d.detail) : ''} (status ${d.status || ''})`).join('; ')}`;
+        } else if (typeof err.response.data.details === 'string') {
+            displayError = `Error: ${err.response.data.details}`;
         } else if (err.response.data.error) {
             displayError = `Error: ${err.response.data.error}`;
         }
@@ -96,100 +107,202 @@ function App() {
     }
     setIsLoading(false);
   };
+  
+  const formatDuration = (isoDuration) => {
+    if (!isoDuration) return 'N/A';
+    return isoDuration.replace('PT', '').replace('H', 'h ').replace('M', 'm');
+  };
+
+  const airlineLogoStyle = { 
+    width: '24px', 
+    height: '24px', 
+    marginRight: '8px', 
+    objectFit: 'contain', 
+    verticalAlign: 'middle',
+    border: '1px solid #eee',
+    borderRadius: '3px'
+  };
 
   return (
-    <div style={styles.container}>
-      <header style={styles.header}>
+    <Container className="py-3 py-md-4">
+      <header className="text-center mb-4">
         <h1>✈️ Tour Operator System</h1>
       </header>
 
-      <div style={{...styles.backendStatus, backgroundColor: isBackendConnected ? '#d4edda' : '#f8d7da', border: `1px solid ${isBackendConnected ? '#c3e6cb' : '#f5c6cb'}`}}>
-        <p style={{margin: 0}}>{backendMessage}</p>
-      </div>
+      <Alert variant={isBackendConnected ? 'success' : 'danger'} className="text-center shadow-sm">
+        {backendMessage}
+      </Alert>
 
       {isBackendConnected && (
         <>
-          <h2>Search Flights</h2>
-          <form onSubmit={handleFlightSearch} style={styles.form}>
-            <div style={styles.inputRow}>
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Trip Type</label>
-                <select value={tripType} onChange={e => setTripType(e.target.value)} style={styles.select}>
-                  <option value="oneWay">One-Way</option>
-                  <option value="roundTrip">Round Trip</option>
-                </select>
-              </div>
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Currency</label>
-                <select value={currency} onChange={e => setCurrency(e.target.value)} style={styles.select}>
-                  {CURRENCIES.map(curr => <option key={curr} value={curr}>{curr}</option>)}
-                </select>
-              </div>
+          <Card className="mb-4 p-3 p-md-4 shadow">
+            <Card.Body>
+              <Card.Title as="h2" className="mb-3 text-primary">Search Flights</Card.Title>
+              {/* This is the corrected form layout you provided */}
+              <Form onSubmit={handleFlightSearch}>
+                <Row className="mb-3">
+                  <Col md={6} className="mb-3 mb-md-0">
+                    <Form.Group controlId="tripType">
+                      <Form.Label>Trip Type</Form.Label>
+                      <Form.Select value={tripType} onChange={e => setTripType(e.target.value)}>
+                        <option value="oneWay">One-Way</option>
+                        <option value="roundTrip">Round Trip</option>
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group controlId="currency">
+                      <Form.Label>Currency</Form.Label>
+                      <Form.Select value={currency} onChange={e => setCurrency(e.target.value)}>
+                        {CURRENCIES.map(curr => <option key={curr} value={curr}>{curr}</option>)}
+                      </Form.Select>
+                    </Form.Group>
+                  </Col>
+                </Row>
+
+                <Row className="mb-3">
+                  <Col md={6} className="mb-3 mb-md-0">
+                    <Form.Group controlId="origin">
+                      <Form.Label>Origin (IATA Code)</Form.Label>
+                      <Form.Control type="text" value={origin} onChange={e => setOrigin(e.target.value)} placeholder="e.g., BKK" required />
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group controlId="destination">
+                      <Form.Label>Destination (IATA Code)</Form.Label>
+                      <Form.Control type="text" value={destination} onChange={e => setDestination(e.target.value)} placeholder="e.g., PEK" required />
+                    </Form.Group>
+                  </Col>
+                </Row>
+
+                <Row className="mb-3">
+                  <Col md={tripType === 'roundTrip' ? 6 : 12} className="mb-3 mb-md-0">
+                    <Form.Group controlId="departureDate">
+                      <Form.Label>Departure Date</Form.Label>
+                      <Form.Control type="date" value={departureDate} onChange={e => setDepartureDate(e.target.value)} required />
+                    </Form.Group>
+                  </Col>
+                  {tripType === 'roundTrip' && (
+                    <Col md={6}>
+                      <Form.Group controlId="returnDate">
+                        <Form.Label>Return Date</Form.Label>
+                        <Form.Control type="date" value={returnDate} onChange={e => setReturnDate(e.target.value)} required={tripType === 'roundTrip'} />
+                      </Form.Group>
+                    </Col>
+                  )}
+                </Row>
+                
+                <Row className="mb-3"> {/* Adults field in its own row for better control */}
+                  <Col md={4} sm={6} xs={8}> {/* Adjust column spans as needed */}
+                    <Form.Group controlId="adults">
+                      <Form.Label>Adults</Form.Label>
+                      <Form.Control type="number" value={adults} onChange={e => setAdults(parseInt(e.target.value, 10))} min="1" required />
+                    </Form.Group>
+                  </Col>
+                </Row>
+
+                <Button variant="primary" type="submit" disabled={isLoading} size="lg" className="w-100 mt-2">
+                  {isLoading ? <><Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" /> Searching...</> : 'Search Flights'}
+                </Button>
+              </Form>
+            </Card.Body>
+          </Card>
+
+          {error && <Alert variant="danger" className="mt-4 shadow-sm">{error}</Alert>}
+          
+          {isLoading && !error && (
+            <div className="text-center mt-4">
+              <Spinner animation="border" variant="primary" style={{ width: '3rem', height: '3rem' }}/>
+              <p className="mt-2 lead">Loading flight offers...</p>
             </div>
+          )}
 
-            <div style={styles.inputRow}>
-                <div style={styles.inputGroup}>
-                <label htmlFor="origin" style={styles.label}>Origin (IATA Code)</label>
-                <input type="text" id="origin" value={origin} onChange={e => setOrigin(e.target.value)} placeholder="e.g., MAD" required style={styles.input} />
-                </div>
-                <div style={styles.inputGroup}>
-                <label htmlFor="destination" style={styles.label}>Destination (IATA Code)</label>
-                <input type="text" id="destination" value={destination} onChange={e => setDestination(e.target.value)} placeholder="e.g., BCN" required style={styles.input} />
-                </div>
-            </div>
+          <div className="results-container mt-4">
+            {flightOffers.length > 0 && !isLoading && 
+                <h3 className="mb-3">Flight Results <Badge bg="secondary">{flightOffers.length} {flightOffers.length === 1 ? 'offer' : 'offers'}</Badge></h3>
+            }
+            {flightOffers.map((offer) => {
+              let mapOriginCoords = null, mapDestCoords = null;
+              let mapOriginName = '', mapDestName = '';
 
-            <div style={styles.inputRow}>
-                <div style={styles.inputGroup}>
-                <label htmlFor="departureDate" style={styles.label}>Departure Date</label>
-                <input type="date" id="departureDate" value={departureDate} onChange={e => setDepartureDate(e.target.value)} required style={styles.input} />
-                </div>
-                {tripType === 'roundTrip' && (
-                <div style={styles.inputGroup}>
-                    <label htmlFor="returnDate" style={styles.label}>Return Date</label>
-                    <input type="date" id="returnDate" value={returnDate} onChange={e => setReturnDate(e.target.value)} required={tripType === 'roundTrip'} style={styles.input} />
-                </div>
-                )}
-            </div>
-            
-            <div style={styles.inputGroup}>
-              <label htmlFor="adults" style={styles.label}>Adults</label>
-              <input type="number" id="adults" value={adults} onChange={e => setAdults(parseInt(e.target.value, 10))} min="1" required style={{...styles.input, width: '100px'}} />
-            </div>
+              if (offer.itineraries && offer.itineraries[0]?.segments?.[0] && dictionaries?.locations) {
+                const firstItinerary = offer.itineraries[0];
+                const firstSegment = firstItinerary.segments[0];
+                const lastSegment = firstItinerary.segments[firstItinerary.segments.length - 1];
+                
+                const originLocationData = dictionaries.locations[firstSegment.departure.iataCode];
+                const destLocationData = dictionaries.locations[lastSegment.arrival.iataCode];
 
-            <button type="submit" disabled={isLoading} style={styles.button}>
-              {isLoading ? 'Searching...' : 'Search Flights'}
-            </button>
-          </form>
+                if (originLocationData?.geoCode) {
+                  mapOriginCoords = originLocationData.geoCode;
+                  mapOriginName = `${originLocationData.detailedName || firstSegment.departure.iataCode} (${firstSegment.departure.iataCode})`;
+                }
+                if (destLocationData?.geoCode) {
+                  mapDestCoords = destLocationData.geoCode;
+                  mapDestName = `${destLocationData.detailedName || lastSegment.arrival.iataCode} (${lastSegment.arrival.iataCode})`;
+                }
+              }
 
-          {error && <div style={styles.error}>{error}</div>}
-          {isLoading && <div style={styles.loading}>Loading flight offers...</div>}
+              return (
+                <Card key={offer.id} className="mb-3 shadow-sm">
+                  <Card.Header as="h5" className="bg-light text-success">
+                    Total Price: {offer.price.total} {offer.price.currency}
+                  </Card.Header>
+                  <Card.Body>
+                    {mapOriginCoords && mapDestCoords && (
+                      <GoogleMapComponent 
+                        originCoords={mapOriginCoords} 
+                        destinationCoords={mapDestCoords}
+                        originName={mapOriginName}
+                        destinationName={mapDestName} 
+                      />
+                    )}
 
-          <div style={styles.resultsContainer}>
-            {flightOffers.length > 0 && <h3>Flight Results ({flightOffers.length} offers found)</h3>}
-            {flightOffers.map((offer, index) => (
-              <div key={offer.id || index} style={styles.flightOffer}>
-                <h4>Offer {index + 1} - Price: <span style={styles.price}>{offer.price.total} {offer.price.currency}</span></h4>
-                {offer.itineraries.map((itinerary, itinIndex) => (
-                  <div key={itinIndex}>
-                    <h5>Itinerary {itinIndex + 1} (Duration: {itinerary.duration.replace('PT', '').replace('H', 'h ').replace('M', 'm')})</h5>
-                    {itinerary.segments.map((segment, segIndex) => (
-                      <div key={segIndex} style={styles.segment}>
-                        <p>
-                          <strong>{segment.departure.iataCode}</strong> ({new Date(segment.departure.at).toLocaleString()}) → <strong>{segment.arrival.iataCode}</strong> ({new Date(segment.arrival.at).toLocaleString()})
-                        </p>
-                        <p>Airline: {segment.carrierCode} {segment.number}, Duration: {segment.duration ? segment.duration.replace('PT', '').replace('H', 'h ').replace('M', 'm') : 'N/A'}</p>
-                        {segment.numberOfStops > 0 && <p>Stops: {segment.numberOfStops}</p>}
+                    {offer.itineraries.map((itinerary, itinIndex) => (
+                      <div key={itinIndex} className="mt-3">
+                        <h6 className="text-muted border-bottom pb-2 mb-2">
+                          Itinerary {itinIndex + 1} (Total Duration: {formatDuration(itinerary.duration)})
+                        </h6>
+                        {itinerary.segments.map((segment, segIndex) => {
+                          const airlineCode = segment.carrierCode;
+                          const airlineName = dictionaries?.carriers?.[airlineCode] || airlineCode;
+                          const aircraftName = dictionaries?.aircraft?.[segment.aircraft?.code] || segment.aircraft?.code || 'N/A';
+                          const logoPath = `/images/airlines/${airlineCode.toUpperCase()}.svg`; // Ensure uppercase for consistency
+
+                          return (
+                            <div key={segIndex} className={`segment-detail mb-2 ${segIndex > 0 ? 'pt-2 border-top' : ''}`}>
+                              <p className="mb-1 small">
+                                <strong>{segment.departure.iataCode}</strong> ({new Date(segment.departure.at).toLocaleString()}) → <strong>{segment.arrival.iataCode}</strong> ({new Date(segment.arrival.at).toLocaleString()})
+                              </p>
+                              <div className="d-flex align-items-center mb-1 small">
+                                <img 
+                                  src={logoPath} 
+                                  alt="" // Decorative as name is next to it
+                                  style={airlineLogoStyle}
+                                  onError={(e) => { e.target.style.display = 'none'; }} 
+                                />
+                                <span>Airline: {airlineName} (Flight {airlineCode} {segment.number})</span>
+                              </div>
+                              <p className="mb-1 ms-1 small">Aircraft: {aircraftName}</p>
+                              <p className="mb-0 ms-1 small">Duration: {formatDuration(segment.duration)}</p>
+                              {segment.numberOfStops > 0 && <p className="mb-0 ms-1 small">Stops: {segment.numberOfStops}</p>}
+                            </div>
+                          );
+                        })}
                       </div>
                     ))}
-                  </div>
-                ))}
-              </div>
-            ))}
+                  </Card.Body>
+                </Card>
+              );
+            })}
           </div>
         </>
       )}
-    </div>
+      <footer className="text-center text-muted mt-5 py-3 border-top">
+        <small>Tour Operator System &copy; {new Date().getFullYear()}</small>
+      </footer>
+    </Container>
   );
 }
 
-export default App;
+export default App; // Make sure this is the very last line
