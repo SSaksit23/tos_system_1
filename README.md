@@ -134,26 +134,4 @@ Before you begin, ensure you have the following installed:
 * **UI/UX Refinements.**
 * **Deployment to a Cloud Platform** (e.g., Railway, Google Cloud Run).
 
-## Project Directory Structure (Simplified)
-├── backend/
-│   ├── Dockerfile
-│   ├── package.json
-│   ├── server.js
-│   └── .env            # (Should be in .gitignore)
-├── frontend/
-│   ├── Dockerfile
-│   ├── package.json
-│   ├── public/
-│   │   ├── images/
-│   │   │   └── airlines/ # Place airline PNG logos here (e.g., AA.png)
-│   │   └── index.html
-│   ├── src/
-│   │   ├── App.js
-│   │   ├── GoogleMapComponent.js
-│   │   └── index.js
-│   └── .env            # (Should be in .gitignore)
-├── database/           # (If using local DB initialization)
-│   └── init.sql
-├── docker-compose.yml
-├── .gitignore
 └── README.md           # This file
