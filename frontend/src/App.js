@@ -1,310 +1,306 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import GoogleMapComponent from './GoogleMapComponent'; 
+// frontend/src/App.js
+import React, { useState } from 'react';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import FlightSearch from './components/FlightSearch';
+import HotelSearch from './components/HotelSearch';
+import AuthModal from './components/auth/AuthModal';
+import { User, LogOut, Settings, Menu, X } from 'lucide-react';
 
-import Container from 'react-bootstrap/Container';
-import Row from 'react-bootstrap/Row';
-import Col from 'react-bootstrap/Col';
-import Form from 'react-bootstrap/Form';
-import Button from 'react-bootstrap/Button';
-import Card from 'react-bootstrap/Card';
-import Alert from 'react-bootstrap/Alert';
-import Spinner from 'react-bootstrap/Spinner';
-import Badge from 'react-bootstrap/Badge';
+const AppContent = () => {
+  const { user, logout, isAuthenticated } = useAuth();
+  const [activeTab, setActiveTab] = useState('flights');
+  const [flightData, setFlightData] = useState(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authModalForm, setAuthModalForm] = useState('login');
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
-const CURRENCIES = ['EUR', 'USD', 'GBP', 'THB', 'JPY', 'CAD', 'AUD'];
-
-function App() {
-  const [backendMessage, setBackendMessage] = useState('Checking backend connection...');
-  const [isBackendConnected, setIsBackendConnected] = useState(false);
-
-  const [tripType, setTripType] = useState('oneWay');
-  const [origin, setOrigin] = useState('');
-  const [destination, setDestination] = useState('');
-  const [departureDate, setDepartureDate] = useState('');
-  const [returnDate, setReturnDate] = useState('');
-  const [adults, setAdults] = useState(1);
-  const [currency, setCurrency] = useState('THB');
-  
-  const [flightOffers, setFlightOffers] = useState([]);
-  const [dictionaries, setDictionaries] = useState(null); 
-  
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    axios.get('http://localhost:5000/api/health')
-      .then(response => {
-        setBackendMessage(`Backend: ${response.data.message} ✅`);
-        setIsBackendConnected(true);
-      })
-      .catch(err => {
-        console.error('Backend connection error:', err);
-        setBackendMessage('Backend connection failed ❌ - Check console and ensure backend is running.');
-        setIsBackendConnected(false);
-      });
-  }, []);
-
-  const handleFlightSearch = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError(null);
-    setFlightOffers([]);
-    setDictionaries(null);
-
-    const searchPayload = {
-      originLocationCode: origin.toUpperCase(),
-      destinationLocationCode: destination.toUpperCase(),
-      departureDate,
-      adults: parseInt(adults, 10),
-      currencyCode: currency,
-    };
-
-    if (tripType === 'roundTrip' && returnDate) {
-      searchPayload.returnDate = returnDate;
-    } else if (tripType === 'roundTrip' && !returnDate) {
-      setError('Please select a return date for round trip flights.');
-      setIsLoading(false); return;
-    }
-
-    try {
-      const response = await axios.post('http://localhost:5000/api/flights/search', searchPayload);
-      if (response.data && response.data.data) {
-        setFlightOffers(response.data.data);
-        setDictionaries(response.data.dictionaries || {});
-         if (response.data.data.length === 0) {
-            setError("No flight offers found for the selected criteria.");
-        }
-      } else {
-        setFlightOffers([]);
-        setDictionaries({});
-        setError("No flight data in response or unexpected structure.");
-        console.warn("No flight data in response or unexpected structure:", response.data);
-      }
-    } catch (err) {
-      console.error('Flight search error:', err.response ? err.response.data : err.message);
-      let displayError = 'Failed to fetch flight offers. Please check inputs and try again.';
-      if (err.response && err.response.data) {
-        if (err.response.data.details && Array.isArray(err.response.data.details)) {
-            displayError = `Error: ${err.response.data.details.map(d => `${d.title || ''}${d.detail ? (': ' + d.detail) : ''} (status ${d.status || ''})`).join('; ')}`;
-        } else if (err.response.data.errors && Array.isArray(err.response.data.errors)){
-             displayError = `Error: ${err.response.data.errors.map(d => `${d.title || ''}${d.detail ? (': ' + d.detail) : ''} (status ${d.status || ''})`).join('; ')}`;
-        } else if (typeof err.response.data.details === 'string') {
-            displayError = `Error: ${err.response.data.details}`;
-        } else if (err.response.data.error) {
-            displayError = `Error: ${err.response.data.error}`;
-        }
-      }
-      setError(displayError);
-    }
-    setIsLoading(false);
-  };
-  
-  const formatDuration = (isoDuration) => {
-    if (!isoDuration) return 'N/A';
-    return isoDuration.replace('PT', '').replace('H', 'h ').replace('M', 'm');
+  const handleOpenAuth = (formType = 'login') => {
+    setAuthModalForm(formType);
+    setShowAuthModal(true);
   };
 
-  // Updated airlineLogoStyle for 400% size increase (24px * 4 = 96px)
-  const airlineLogoStyle = { 
-    width: '96px',  // Increased from 24px
-    height: '96px', // Increased from 24px
-    marginRight: '10px', // Slightly increased margin for larger logo
-    objectFit: 'contain', 
-    verticalAlign: 'middle',
-    border: '1px solid #eee',
-    borderRadius: '4px' // Slightly larger radius for larger logo
+  const handleLogout = async () => {
+    await logout();
+    setShowUserMenu(false);
+    setFlightData(null); // Clear any stored flight data
   };
 
   return (
-    <Container className="py-3 py-md-4"> {/* Standard container, should be responsive and centered */}
-      <header className="text-center mb-4"><h1>✈️ Tour Operator System</h1></header>
-      <Alert variant={isBackendConnected ? 'success' : 'danger'} className="text-center shadow-sm">
-        {backendMessage}
-      </Alert>
-
-      {isBackendConnected && (
-        <Row className="justify-content-center"> 
-          <Col md={10} lg={8} xl={7}> {/* This Col centers its content block */}
-            
-            <Card className="mb-4 p-3 p-md-4 shadow">
-              <Card.Body>
-                <Card.Title as="h2" className="mb-3 text-primary">Search Flights</Card.Title>
-                <Form onSubmit={handleFlightSearch}>
-                  {/* Form rows for trip type, currency */}
-                  <Row className="mb-3">
-                    <Col md={6} className="mb-3 mb-md-0">
-                      <Form.Group controlId="tripType">
-                        <Form.Label>Trip Type</Form.Label>
-                        <Form.Select value={tripType} onChange={e => setTripType(e.target.value)}>
-                          <option value="oneWay">One-Way</option>
-                          <option value="roundTrip">Round Trip</option>
-                        </Form.Select>
-                      </Form.Group>
-                    </Col>
-                    <Col md={6}>
-                      <Form.Group controlId="currency">
-                        <Form.Label>Currency</Form.Label>
-                        <Form.Select value={currency} onChange={e => setCurrency(e.target.value)}>
-                          {CURRENCIES.map(curr => <option key={curr} value={curr}>{curr}</option>)}
-                        </Form.Select>
-                      </Form.Group>
-                    </Col>
-                  </Row>
-
-                  {/* Form rows for origin/dest */}
-                  <Row className="mb-3">
-                    <Col md={6} className="mb-3 mb-md-0">
-                      <Form.Group controlId="origin">
-                        <Form.Label>Origin (IATA Code)</Form.Label>
-                        <Form.Control type="text" value={origin} onChange={e => setOrigin(e.target.value)} placeholder="e.g., BKK" required />
-                      </Form.Group>
-                    </Col>
-                    <Col md={6}>
-                      <Form.Group controlId="destination">
-                        <Form.Label>Destination (IATA Code)</Form.Label>
-                        <Form.Control type="text" value={destination} onChange={e => setDestination(e.target.value)} placeholder="e.g., PEK" required />
-                      </Form.Group>
-                    </Col>
-                  </Row>
-
-                  {/* Form rows for dates */}
-                  <Row className="mb-3">
-                    <Col md={tripType === 'roundTrip' ? 6 : 12} className="mb-3 mb-md-0">
-                      <Form.Group controlId="departureDate">
-                        <Form.Label>Departure Date</Form.Label>
-                        <Form.Control type="date" value={departureDate} onChange={e => setDepartureDate(e.target.value)} required />
-                      </Form.Group>
-                    </Col>
-                    {tripType === 'roundTrip' && (
-                      <Col md={6}>
-                        <Form.Group controlId="returnDate">
-                          <Form.Label>Return Date</Form.Label>
-                          <Form.Control type="date" value={returnDate} onChange={e => setReturnDate(e.target.value)} required={tripType === 'roundTrip'} />
-                        </Form.Group>
-                      </Col>
-                    )}
-                  </Row>
-                  
-                  {/* Form row for adults */}
-                  <Row className="mb-3">
-                    <Col md={4} sm={6} xs={8}>
-                      <Form.Group controlId="adults">
-                        <Form.Label>Adults</Form.Label>
-                        <Form.Control type="number" value={adults} onChange={e => setAdults(parseInt(e.target.value, 10))} min="1" required />
-                      </Form.Group>
-                    </Col>
-                  </Row>
-
-                  <Button variant="primary" type="submit" disabled={isLoading} size="lg" className="w-100 mt-2">
-                    {isLoading ? <><Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" /> Searching...</> : 'Search Flights'}
-                  </Button>
-                </Form>
-              </Card.Body>
-            </Card>
-
-            {error && <Alert variant="danger" className="mt-4 shadow-sm">{error}</Alert>}
-            
-            {isLoading && !error && (
-              <div className="text-center mt-4">
-                <Spinner animation="border" variant="primary" style={{ width: '3rem', height: '3rem' }}/>
-                <p className="mt-2 lead">Loading flight offers...</p>
-              </div>
-            )}
-
-            <div className="results-container mt-4">
-              {flightOffers.length > 0 && !isLoading && 
-                  <h3 className="mb-3">Flight Results <Badge bg="secondary">{flightOffers.length} {flightOffers.length === 1 ? 'offer' : 'offers'}</Badge></h3>
-              }
-              {flightOffers.map((offer) => {
-                let mapOriginCoords = null, mapDestCoords = null;
-                let mapOriginName = '', mapDestName = '';
-
-                if (dictionaries && dictionaries.locations && offer.itineraries && offer.itineraries[0]?.segments?.[0]) {
-                  const firstItinerary = offer.itineraries[0];
-                  const firstSegment = firstItinerary.segments[0];
-                  const lastSegment = firstItinerary.segments[firstItinerary.segments.length - 1];
-                  
-                  const originLocationData = dictionaries.locations[firstSegment.departure.iataCode];
-                  const destLocationData = dictionaries.locations[lastSegment.arrival.iataCode];
-
-                  if (originLocationData?.geoCode) {
-                    mapOriginCoords = originLocationData.geoCode;
-                    mapOriginName = `${originLocationData.detailedName || firstSegment.departure.iataCode} (${firstSegment.departure.iataCode})`;
-                  }
-                  if (destLocationData?.geoCode) {
-                    mapDestCoords = destLocationData.geoCode;
-                    mapDestName = `${destLocationData.detailedName || lastSegment.arrival.iataCode} (${lastSegment.arrival.iataCode})`;
-                  }
-                }
-
-                return (
-                  <Card key={offer.id} className="mb-3 shadow-sm">
-                    <Card.Header as="h5" className="bg-light text-success">
-                      Total Price: {offer.price.total} {offer.price.currency}
-                    </Card.Header>
-                    <Card.Body>
-                      {mapOriginCoords && mapDestCoords ? (
-                        <GoogleMapComponent 
-                          originCoords={mapOriginCoords} 
-                          destinationCoords={mapDestCoords}
-                          originName={mapOriginName}
-                          destinationName={mapDestName} 
-                        />
-                      ) : (
-                        <p className="text-muted small text-center my-3">Map data not available (dictionaries not loaded).</p>
-                      )}
-
-                      {offer.itineraries.map((itinerary, itinIndex) => (
-                        <div key={itinIndex} className="mt-3">
-                          <h6 className="text-muted border-bottom pb-2 mb-2">
-                            Itinerary {itinIndex + 1} (Total Duration: {formatDuration(itinerary.duration)})
-                          </h6>
-                          {itinerary.segments.map((segment, segIndex) => {
-                            const airlineCode = segment.carrierCode;
-                            const airlineName = (dictionaries && dictionaries.carriers && dictionaries.carriers[airlineCode]) 
-                                                ? dictionaries.carriers[airlineCode] 
-                                                : airlineCode; 
-                            const aircraftName = (dictionaries && dictionaries.aircraft && segment.aircraft && dictionaries.aircraft[segment.aircraft.code]) 
-                                                 ? dictionaries.aircraft[segment.aircraft.code] 
-                                                 : (segment.aircraft?.code || 'N/A');
-                            const logoPath = `/images/airlines/${airlineCode.toUpperCase()}.png`; 
-
-                            return (
-                              <div key={segIndex} className={`segment-detail mb-2 ${segIndex > 0 ? 'pt-2 border-top' : ''}`}>
-                                <p className="mb-1 small">
-                                  <strong>{segment.departure.iataCode}</strong> ({new Date(segment.departure.at).toLocaleString()}) → <strong>{segment.arrival.iataCode}</strong> ({new Date(segment.arrival.at).toLocaleString()})
-                                </p>
-                                <div className="d-flex align-items-center mb-1 small">
-                                  <img 
-                                    src={logoPath} 
-                                    alt=""
-                                    style={airlineLogoStyle} // Using the updated style for logo
-                                    onError={(e) => { e.target.style.display = 'none'; }} 
-                                  />
-                                  <span>Airline: {airlineName} (Flight {airlineCode} {segment.number})</span>
-                                </div>
-                                <p className="mb-1 ms-1 small">Aircraft: {aircraftName}</p>
-                                <p className="mb-0 ms-1 small">Duration: {formatDuration(segment.duration)}</p>
-                                {segment.numberOfStops > 0 && <p className="mb-0 ms-1 small">Stops: {segment.numberOfStops}</p>}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ))}
-                    </Card.Body>
-                  </Card>
-                );
-              })}
+    <div className="min-h-screen bg-gray-100">
+      {/* Header */}
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex justify-between items-center">
+            {/* Logo */}
+            <div className="flex items-center space-x-2">
+              <h1 className="text-2xl font-bold text-gray-900">✈️ AdventureConnect</h1>
+              <span className="hidden sm:block text-sm text-gray-600 bg-blue-100 px-2 py-1 rounded">
+                Powered by Amadeus API
+              </span>
             </div>
-          </Col>
-        </Row>
+
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center space-x-4">
+              {isAuthenticated ? (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowUserMenu(!showUserMenu)}
+                    className="flex items-center space-x-2 px-4 py-2 rounded-lg hover:bg-gray-100 transition"
+                  >
+                    <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                      <span className="text-white font-medium">
+                        {user?.firstName?.[0]}{user?.lastName?.[0]}
+                      </span>
+                    </div>
+                    <div className="text-left">
+                      <div className="text-sm font-medium text-gray-900">
+                        {user?.firstName} {user?.lastName}
+                      </div>
+                      <div className="text-xs text-gray-500 capitalize">
+                        {user?.role?.replace('_', ' ')}
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* User Dropdown Menu */}
+                  {showUserMenu && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border py-1 z-10">
+                      <button className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center space-x-2">
+                        <User className="h-4 w-4" />
+                        <span>Profile</span>
+                      </button>
+                      <button className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center space-x-2">
+                        <Settings className="h-4 w-4" />
+                        <span>Settings</span>
+                      </button>
+                      <hr className="my-1" />
+                      <button
+                        onClick={handleLogout}
+                        className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handleOpenAuth('login')}
+                    className="px-4 py-2 text-gray-700 hover:text-gray-900 font-medium"
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    onClick={() => handleOpenAuth('register')}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                  >
+                    Sign Up
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Mobile Menu Button */}
+            <div className="md:hidden">
+              <button
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+                className="p-2 rounded-lg hover:bg-gray-100"
+              >
+                {showMobileMenu ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile Menu */}
+          {showMobileMenu && (
+            <div className="md:hidden mt-4 pb-4 border-t">
+              {isAuthenticated ? (
+                <div className="pt-4 space-y-2">
+                  <div className="px-4 py-2">
+                    <div className="text-sm font-medium text-gray-900">
+                      {user?.firstName} {user?.lastName}
+                    </div>
+                    <div className="text-xs text-gray-500 capitalize">
+                      {user?.role?.replace('_', ' ')}
+                    </div>
+                  </div>
+                  <button className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center space-x-2">
+                    <User className="h-4 w-4" />
+                    <span>Profile</span>
+                  </button>
+                  <button className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center space-x-2">
+                    <Settings className="h-4 w-4" />
+                    <span>Settings</span>
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="pt-4 space-y-2">
+                  <button
+                    onClick={() => handleOpenAuth('login')}
+                    className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100"
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    onClick={() => handleOpenAuth('register')}
+                    className="w-full px-4 py-2 text-left bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    Sign Up
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* Auth Required Notice for Unauthenticated Users */}
+      {!isAuthenticated && (
+        <div className="bg-blue-50 border-b border-blue-200">
+          <div className="max-w-7xl mx-auto px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <span className="text-blue-600">🎯</span>
+                <span className="text-blue-800 text-sm">
+                  Sign up to save your searches, create custom trips, and book with local providers!
+                </span>
+              </div>
+              <button
+                onClick={() => handleOpenAuth('register')}
+                className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+              >
+                Get Started →
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-      <footer className="text-center text-muted mt-5 py-3 border-top">
-        <small>Tour Operator System &copy; {new Date().getFullYear()}</small>
-      </footer>
-    </Container>
+
+      {/* Navigation Tabs */}
+      <nav className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex space-x-8">
+            <button
+              onClick={() => setActiveTab('flights')}
+              className={`py-4 px-1 border-b-2 font-medium ${
+                activeTab === 'flights'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              🛫 Flights
+            </button>
+            <button
+              onClick={() => setActiveTab('hotels')}
+              className={`py-4 px-1 border-b-2 font-medium ${
+                activeTab === 'hotels'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              🏨 Hotels
+            </button>
+            {isAuthenticated && (
+              <>
+                <button
+                  onClick={() => setActiveTab('trips')}
+                  className={`py-4 px-1 border-b-2 font-medium ${
+                    activeTab === 'trips'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  🎒 My Trips
+                </button>
+                <button
+                  onClick={() => setActiveTab('customize')}
+                  className={`py-4 px-1 border-b-2 font-medium ${
+                    activeTab === 'customize'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  ✨ Customize Trip
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto py-6 px-4">
+        {activeTab === 'flights' && <FlightSearch onFlightSelect={setFlightData} />}
+        {activeTab === 'hotels' && <HotelSearch flightData={flightData} />}
+        {activeTab === 'trips' && isAuthenticated && <MyTripsComponent />}
+        {activeTab === 'customize' && isAuthenticated && <TripCustomizationComponent />}
+      </main>
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        initialForm={authModalForm}
+      />
+
+      {/* Click outside to close dropdowns */}
+      {(showUserMenu || showMobileMenu) && (
+        <div
+          className="fixed inset-0 z-10"
+          onClick={() => {
+            setShowUserMenu(false);
+            setShowMobileMenu(false);
+          }}
+        />
+      )}
+    </div>
   );
-}
+};
+
+// Placeholder components for authenticated features
+const MyTripsComponent = () => (
+  <div className="bg-white rounded-xl shadow-lg p-8 text-center">
+    <h2 className="text-2xl font-bold text-gray-800 mb-4">My Trips</h2>
+    <p className="text-gray-600 mb-6">
+      Your saved trips and booking history will appear here.
+    </p>
+    <div className="text-6xl mb-4">🎒</div>
+    <p className="text-sm text-gray-500">
+      Feature coming soon in Phase 2 of development!
+    </p>
+  </div>
+);
+
+const TripCustomizationComponent = () => (
+  <div className="bg-white rounded-xl shadow-lg p-8 text-center">
+    <h2 className="text-2xl font-bold text-gray-800 mb-4">Custom Trip Builder</h2>
+    <p className="text-gray-600 mb-6">
+      Build your perfect trip with AI-powered recommendations and local experiences.
+    </p>
+    <div className="text-6xl mb-4">✨</div>
+    <p className="text-sm text-gray-500">
+      Core feature coming in Phase 3 - Trip Customization Engine!
+    </p>
+  </div>
+);
+
+// Main App Component with Auth Provider
+const App = () => {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
+};
 
 export default App;
